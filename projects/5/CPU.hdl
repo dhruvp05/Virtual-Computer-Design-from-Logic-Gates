@@ -32,5 +32,45 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-	//// Replace this comment with your code.
+    //Control of Mux16
+    And16(a=instruction, b[0..14]=false, b[15]=true, out[15]=opcode);
+    Mux16(a=instruction, b=ALUOut, sel=opcode, out[0..14]=MuxOut); //ALUOut yet to be defined
+
+    //A register
+    Mux4Way16(a=true, b=true, c=false, d=true, sel[0]=instruction[5], sel[1]=opcode, out[0]=ARegLoad);
+    ARegister(in[15]=false, in[0..14]=MuxOut, load=ARegLoad, out[0..14]=AOut);
+
+    //D Register
+    Mux4Way16(a=false, b=false, c=false, d=true, sel[0]=instruction[4], sel[1]=opcode, out[0]=DRegLoad);
+    DRegister(in=ALUOut, load=DRegLoad, out=ALU1); //DOut=ALU1
+    
+    //Channeling one of A or M to ALU input
+    Mux16(a[15]=false, a[0..14]=AOut, b=inM, sel=instruction[12], out=ALU2); //AOutOrinM=ALU2
+
+    //ALU
+    ALU(x=ALU1, y=ALU2, zx=instruction[11], nx=instruction[10], zy=instruction[9], ny=instruction[8], f=instruction[7], no=instruction[6], out=outM, out=ALUOut, zr=z, ng=n); //ALUOut defined here
+
+   //writeM = instruction[3]
+   Mux4Way16(a=false, b=false, c=false, d=true, sel[0]=instruction[3], sel[1]=opcode, out[0]=writeM);
+
+   //addressM = AOut
+   Not16(in[15]=true, in[0..14]=AOut, out=out2);
+   Not16(in=out2, out[0..14]=addressM);
+
+   //load for PC
+   Not(in=instruction[0], out=NotJ0);
+   Not(in=instruction[2], out=NotJ2);
+   Not(in=z, out=Notz);
+   Not(in=n, out=Notn);
+
+   And16(a[0]=instruction[0], a[1]=instruction[1], a[2]=instruction[2], a[3]=instruction[2], a[4..15]=false, b[0]=Notz, b[1]=z, b[2]=Notz, b[3]=instruction[1], b[4..15]=false, out[0]=t0, out[1]=t1, out[2]=t2, out[3]=t3);
+
+   And16(a[0]=t0, a[1]=t1, a[2]=t2, a[3]=t3, a[4..15]=false, b[0]=Notn, b[1]=Notn, b[2]=n, b[3]=instruction[0], b[4..15]=false, out[0]=term0, out[1]=term1, out[2]=term2, out[3]=term3);
+
+   Or8Way(in[0]=term0, in[1]=term1, in[2]=term2, in[3]=term3, in[4..7]=false, out=intPCLoad);
+   
+   And(a=opcode, b=intPCLoad, out=PCLoad);
+
+   //PC and its load
+   PC(in[15]=false, in[0..14]=AOut, load=PCLoad, inc=true, reset=reset, out[0..14]=pc);
 }
